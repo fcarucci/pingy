@@ -1,4 +1,4 @@
-import { Service, PlatformAccessory, PlatformConfig } from 'homebridge';
+import { Service, PlatformAccessory } from 'homebridge';
 
 import { PingyPlatform } from './platform';
 import * as ping from 'net-ping';
@@ -11,6 +11,7 @@ import * as dns from 'dns';
  */
 export class PingyPlatformAccessory {
 
+  /* eslint-disable  @typescript-eslint/no-explicit-any */
   private static session: any;
   private service: Service;
 
@@ -73,7 +74,7 @@ export class PingyPlatformAccessory {
       family: 4,
     };
 
-    dns.lookup(target, options, (err, address, family) => {
+    dns.lookup(target, options, (err, address) => {
       if (!err) {
         PingyPlatformAccessory.session.pingHost (address, (error, target, sent, rcvd) => {
           const ms = rcvd - sent;
