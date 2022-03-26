@@ -1,5 +1,5 @@
 {
-  "private": true,
+  "private": false,
   "displayName": "Pingy",
   "name": "homebridge-pingy",
   "version": "0.1.0",
