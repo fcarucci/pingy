@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "Pingy",
+  "pluginAlias": "homebridge-pingy",
   "pluginType": "platform",
   "singular": true,
   "schema": {
