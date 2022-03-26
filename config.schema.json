@@ -1,0 +1,27 @@
+{
+  "pluginAlias": "Pingy",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "targets": {
+      "type": "array",
+      "items": {
+        "title": "Target",
+        "type": "object",
+        "properties": {
+            "target": {
+                "title": "ipv4 address or hostname",
+                "type": "string",
+                "required": true
+            },
+            "interval": {
+              "title": "interval in seconds (default:",
+              "type": "number",
+              "required": false,
+              "default": "0"
+            }                
+        }
+      }
+    }
+  }
+}
