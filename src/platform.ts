@@ -119,7 +119,8 @@ export class PingyPlatform implements DynamicPlatformPlugin {
     }
 
     if (aggregateAccessory !== undefined) {
-      PingyPlatformAccessory.setAggregateAccessory(new PingyPlatformAggregateAccessory(this, aggregateAccessory, pingAccessories));
+      PingyPlatformAccessory.setAggregateAccessory(
+        new PingyPlatformAggregateAccessory(this, this.config.aggregate_name, aggregateAccessory, pingAccessories));
     }
   }
 }

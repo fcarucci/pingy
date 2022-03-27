@@ -30,7 +30,6 @@ export class PingyPlatformAccessory {
     this.lastPingTimeinMS = 0;
     this.status = this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
 
-    // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
       .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
@@ -40,9 +39,6 @@ export class PingyPlatformAccessory {
       this.accessory.addService(this.platform.Service.ContactSensor);
 
     this.service.setCharacteristic(this.platform.Characteristic.Name, target);
-
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
 
     this.accessory.getService('Ping') ||
       this.accessory.addService(this.platform.Service.AccessoryRuntimeInformation, 'Ping', 'AccessoryRuntimeInformation-1');
@@ -130,6 +126,7 @@ export class PingyPlatformAggregateAccessory {
 
   constructor(
     private readonly platform: PingyPlatform,
+    private readonly name: string,
     private readonly accessory: PlatformAccessory,
     private readonly accessories: Set<PingyPlatformAccessory>,
   ) {
@@ -143,7 +140,7 @@ export class PingyPlatformAggregateAccessory {
     this.service = this.accessory.getService(this.platform.Service.ContactSensor) ||
       this.accessory.addService(this.platform.Service.ContactSensor);
 
-    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Pings');
+    this.service.setCharacteristic(this.platform.Characteristic.Name, name);
     this.service.setCharacteristic(
       this.platform.Characteristic.ContactSensorState,
       this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
