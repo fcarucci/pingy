@@ -1,8 +1,9 @@
 import { Service, PlatformAccessory } from 'homebridge';
 
 import { PingyPlatform } from './platform';
-import * as ping from 'net-ping';
+import * as tcpp from 'tcp-ping';
 import * as dns from 'dns';
+import { ValueWrapper } from 'hap-nodejs';
 
 /**
  * Platform Accessory
@@ -10,12 +11,11 @@ import * as dns from 'dns';
  * Each accessory may expose multiple services of different service types.
  */
 export class PingyPlatformAccessory {
-
-  /* eslint-disable  @typescript-eslint/no-explicit-any */
-  private static session: any;
   private service: Service;
 
   private lastPingTimeinMS: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private status: any;
 
   constructor(
     private readonly platform: PingyPlatform,
@@ -23,7 +23,7 @@ export class PingyPlatformAccessory {
     private readonly target: string,
     private readonly interval: number,
   ) {
-    this.lastPingTimeinMS = 0;
+    this.lastPingTimeinMS = -1;
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
@@ -57,48 +57,33 @@ export class PingyPlatformAccessory {
   }
 
   pingHost(target: string) {
-    if (!PingyPlatformAccessory.session) {
-      PingyPlatformAccessory.session = ping.createSession({packetSize: 64});
-      if (PingyPlatformAccessory.session) {
-        PingyPlatformAccessory.session.on ('error', () => {
-          PingyPlatformAccessory.session!.close();
-          PingyPlatformAccessory.session = null;
-        });
-        PingyPlatformAccessory.session.on ('close', () => {
-          PingyPlatformAccessory.session = null;
-        });
-      }
-    }
-
     const options = {
       family: 4,
     };
 
     dns.lookup(target, options, (err, address) => {
       if (!err) {
-        PingyPlatformAccessory.session.pingHost (address, (error, target, sent, rcvd) => {
-          let lastPingTimeinMS = 0;
-          if (!error) {
-            lastPingTimeinMS = rcvd - sent;
+        tcpp.ping({ address: target, timeout: 1000, attempts: 3 }, (err, data) => {
+          if (!isNaN(data.avg)) {
+            this.lastPingTimeinMS = data.avg;
           }
+          const status = this.lastPingTimeinMS > 0 ?
+            this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED:
+            this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
 
-          if (lastPingTimeinMS !== this.lastPingTimeinMS) {
-            this.lastPingTimeinMS = lastPingTimeinMS;
-
-            const status = this.lastPingTimeinMS > 0 ?
-              this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED:
-              this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+          if (this.status !== status) {
+            this.status = status;
 
             this.service.setCharacteristic(
-              this.platform.Characteristic.ContactSensorState, status);
+              this.platform.Characteristic.ContactSensorState, this.status);
 
             const msg = status === this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED ?
               'CONTACT DETECTED' :
               'CONTACT NOT DETECTED';
 
-            this.platform.log.debug('Triggered SET ContactSensorState [' + this.target + ']: ' +
+            this.platform.log.info('Triggered SET ContactSensorState [' + this.target + ']: ' +
               msg + ' (' +
-              this.lastPingTimeinMS + 'ms)');
+              this.lastPingTimeinMS.toFixed(1) + 'ms)');
           }
         });
       } else {
