@@ -3,7 +3,6 @@ import { Service, PlatformAccessory } from 'homebridge';
 import { PingyPlatform } from './platform';
 import * as tcpp from 'tcp-ping';
 import * as dns from 'dns';
-import { ValueWrapper } from 'hap-nodejs';
 
 /**
  * Platform Accessory
@@ -63,7 +62,7 @@ export class PingyPlatformAccessory {
 
     dns.lookup(target, options, (err, address) => {
       if (!err) {
-        tcpp.ping({ address: target, timeout: 1000, attempts: 3 }, (err, data) => {
+        tcpp.ping({ address: address, timeout: 1000, attempts: 3 }, (err, data) => {
           if (!isNaN(data.avg)) {
             this.lastPingTimeinMS = data.avg;
           }
