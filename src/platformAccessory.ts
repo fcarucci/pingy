@@ -34,9 +34,6 @@ export class PingyPlatformAccessory {
     this.service = this.accessory.getService(this.platform.Service.ContactSensor) ||
       this.accessory.addService(this.platform.Service.ContactSensor);
 
-    this.service.getCharacteristic(platform.api.hap.Characteristic.ContactSensorState).
-      onGet(this.handleContactSensorStateGet.bind(this));
-
     this.service.setCharacteristic(this.platform.Characteristic.Name, target);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
@@ -48,12 +45,15 @@ export class PingyPlatformAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.Ping)
       .onGet(this.handlePingGet.bind(this));
 
-    const refresh_interval = this.interval > 0 ? this.interval * 1000 : 60 * 1000;
+    let refresh_interval = this.interval > 0 ? this.interval : 60;
+    if (refresh_interval < 5) {
+      refresh_interval = 5;
+    }
 
     this.pingHost(this.target);
     setInterval(() => {
       this.pingHost(this.target);
-    }, refresh_interval);
+    }, refresh_interval * 1000);
   }
 
   pingHost(target: string) {
@@ -77,33 +77,37 @@ export class PingyPlatformAccessory {
     dns.lookup(target, options, (err, address) => {
       if (!err) {
         PingyPlatformAccessory.session.pingHost (address, (error, target, sent, rcvd) => {
-          const ms = rcvd - sent;
-          if (error) {
-            this.lastPingTimeinMS = 0;
-          } else {
-            this.lastPingTimeinMS = ms;
+          let lastPingTimeinMS = 0;
+          if (!error) {
+            lastPingTimeinMS = rcvd - sent;
+          }
+
+          if (lastPingTimeinMS !== this.lastPingTimeinMS) {
+            this.lastPingTimeinMS = lastPingTimeinMS;
+
+            const status = this.lastPingTimeinMS > 0 ?
+              this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED:
+              this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+
+            this.service.setCharacteristic(
+              this.platform.Characteristic.ContactSensorState, status);
+
+            const msg = status === this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED ?
+              'CONTACT DETECTED' :
+              'CONTACT NOT DETECTED';
+
+            this.platform.log.debug('Triggered SET ContactSensorState [' + this.target + ']: ' +
+              msg + ' (' +
+              this.lastPingTimeinMS + 'ms)');
           }
         });
       } else {
         this.lastPingTimeinMS = 0;
+        this.service.setCharacteristic(
+          this.platform.Characteristic.ContactSensorState,
+          this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
       }
     });
-  }
-
-  handleContactSensorStateGet() {
-    let value = this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
-
-    if (this.lastPingTimeinMS > 0) {
-      value = this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED;
-    }
-
-    const msg = value === this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED ? 'CONTACT DETECTED' : 'CONTACT NOT DETECTED';
-
-    this.platform.log.debug('Triggered GET ContactSensorState [' + this.target + ']: ' +
-      msg + ' (' +
-      this.lastPingTimeinMS + 'ms)');
-
-    return value;
   }
 
   handlePingGet() {
