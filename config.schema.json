@@ -3,6 +3,17 @@
   "pluginType": "platform",
   "singular": true,
   "schema": {
+    "aggregate": {
+      "title": "Aggregate all pings into one sensor",
+      "type": "boolean",
+      "default": "false"
+    },
+    "aggregate_name": {
+      "title": "Aggregatr sensor name",
+      "type": "string",
+      "required": false,
+      "default": "Pings"
+    },
     "targets": {
       "type": "array",
       "items": {
@@ -15,7 +26,7 @@
                 "required": true
             },
             "interval": {
-              "title": "interval in seconds (default:",
+              "title": "interval in seconds (default: 0)",
               "type": "number",
               "required": false,
               "default": "0"

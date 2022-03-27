@@ -1,4 +1,4 @@
-import { Service, PlatformAccessory } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { PingyPlatform } from './platform';
 import * as tcpp from 'tcp-ping';
@@ -13,8 +13,13 @@ export class PingyPlatformAccessory {
   private service: Service;
 
   private lastPingTimeinMS: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private status: any;
+  private status: CharacteristicValue;
+
+  private static aggregateAccessory: PingyPlatformAggregateAccessory;
+
+  static setAggregateAccessory(accessory) {
+    PingyPlatformAccessory.aggregateAccessory = accessory;
+  }
 
   constructor(
     private readonly platform: PingyPlatform,
@@ -22,7 +27,8 @@ export class PingyPlatformAccessory {
     private readonly target: string,
     private readonly interval: number,
   ) {
-    this.lastPingTimeinMS = -1;
+    this.lastPingTimeinMS = 0;
+    this.status = this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
@@ -48,6 +54,9 @@ export class PingyPlatformAccessory {
     if (refresh_interval < 5) {
       refresh_interval = 5;
     }
+
+    this.service.setCharacteristic(
+      this.platform.Characteristic.ContactSensorState, this.status);
 
     this.pingHost(this.target);
     setInterval(() => {
@@ -83,6 +92,8 @@ export class PingyPlatformAccessory {
             this.platform.log.info('Triggered SET ContactSensorState [' + this.target + ']: ' +
               msg + ' (' +
               this.lastPingTimeinMS.toFixed(1) + 'ms)');
+
+            this.updateAggregateAccessory();
           }
         });
       } else {
@@ -90,11 +101,73 @@ export class PingyPlatformAccessory {
         this.service.setCharacteristic(
           this.platform.Characteristic.ContactSensorState,
           this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
+
+        if (PingyPlatformAccessory.aggregateAccessory) {
+          PingyPlatformAccessory.aggregateAccessory.update();
+        }
       }
     });
   }
 
+  private updateAggregateAccessory() {
+    if (PingyPlatformAccessory.aggregateAccessory) {
+      PingyPlatformAccessory.aggregateAccessory.update();
+    }
+  }
+
   handlePingGet() {
     return String(this.lastPingTimeinMS);
+  }
+
+  isConnected() {
+    return this.status === this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED;
+  }
+}
+
+export class PingyPlatformAggregateAccessory {
+  private service: Service;
+  private status: CharacteristicValue;
+
+  constructor(
+    private readonly platform: PingyPlatform,
+    private readonly accessory: PlatformAccessory,
+    private readonly accessories: Set<PingyPlatformAccessory>,
+  ) {
+    this.status = this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+
+    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+
+    this.service = this.accessory.getService(this.platform.Service.ContactSensor) ||
+      this.accessory.addService(this.platform.Service.ContactSensor);
+
+    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Pings');
+    this.service.setCharacteristic(
+      this.platform.Characteristic.ContactSensorState,
+      this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED);
+  }
+
+  public update() {
+    let status = this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED;
+    for (const accessory of this.accessories) {
+      if (!accessory.isConnected()) {
+        status = this.platform.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED;
+        break;
+      }
+    }
+
+    if (this.status !== status) {
+      this.status = status;
+      const msg = this.status === this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED ?
+        'CONTACT DETECTED' :
+        'CONTACT NOT DETECTED';
+
+      this.platform.log.info('Update aggregate Ping ContactSensorState: ' + msg);
+
+      this.service.setCharacteristic(
+        this.platform.Characteristic.ContactSensorState, this.status);
+    }
   }
 }

@@ -2,6 +2,7 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { PingyPlatformAccessory } from './platformAccessory';
+import { PingyPlatformAggregateAccessory } from './platformAccessory';
 
 export class PingyPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
@@ -46,6 +47,7 @@ export class PingyPlatform implements DynamicPlatformPlugin {
     const targets = this.config.targets || [];
 
     const registeredAccessories = new Set();
+    const pingAccessories = new Set<PingyPlatformAccessory>();
 
     for (const device of targets) {
       // generate a unique id for the accessory this should be generated from
@@ -67,7 +69,7 @@ export class PingyPlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the restored accessory
         // this is imported from `platformAccessory.ts`
-        new PingyPlatformAccessory(this, existingAccessory, device.target, device.interval);
+        pingAccessories.add(new PingyPlatformAccessory(this, existingAccessory, device.target, device.interval));
       } else {
         // the accessory does not yet exist, so we need to create it
         this.log.info('Adding new accessory:', device.target);
@@ -80,7 +82,7 @@ export class PingyPlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        new PingyPlatformAccessory(this, accessory, device.target, device.interval);
+        pingAccessories.add(new PingyPlatformAccessory(this, accessory, device.target, device.interval));
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -92,6 +94,32 @@ export class PingyPlatform implements DynamicPlatformPlugin {
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         this.log.info('Removing existing accessory from cache:', accessory.displayName);
       }
+    }
+
+    const aggregate_uuid = this.api.hap.uuid.generate('PingsAggregate');
+
+    let aggregateAccessory = this.accessories.find(accessory => accessory.UUID === aggregate_uuid);
+
+    if (aggregateAccessory) {
+      if (this.config.aggregate) {
+        this.log.info('Restoring existing accessory from cache:', aggregateAccessory.displayName);
+      } else {
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [aggregateAccessory]);
+        aggregateAccessory = undefined;
+      }
+    } else {
+      if (this.config.aggregate) {
+        this.log.info('Adding new aggregate accessory:', this.config.aggregate_name);
+        aggregateAccessory = new this.api.platformAccessory(this.config.aggregate_name, aggregate_uuid);
+        aggregateAccessory.context.device = this.config.aggregate_nameaggregate_name;
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [aggregateAccessory]);
+      } else {
+        aggregateAccessory = undefined;
+      }
+    }
+
+    if (aggregateAccessory !== undefined) {
+      PingyPlatformAccessory.setAggregateAccessory(new PingyPlatformAggregateAccessory(this, aggregateAccessory, pingAccessories));
     }
   }
 }
